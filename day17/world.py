@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from reward import Reward
 from transition import Transition
 from copy import deepcopy
+import time
 
 class World(object):
     def __init__(self, xdim, ydim, reward, transition):
@@ -22,7 +23,7 @@ class World(object):
 
 def initialize_value(world: World):
     """Given a grid world, initialize the value function."""
-    Vhat = np.zeros((len(world.all_states[0]), len(world.all_states[1])))
+    Vhat = np.zeros_like(world.world)
     return Vhat
 
 def value_iteration(world: World, actions: list[str], discount: float, epsilon: float):
@@ -82,7 +83,11 @@ def policy_iteration(world: World, actions: list[str], discount: float):
             
         if p == pihat:  # policy has converged
             break
-
+    
+    for state in world.all_states:  # update the value function
+            Vhat[state] = sum(world.compute_action_probability(state, pihat[state], next_state) * 
+                              (world.compute_reward(state, pihat[state], next_state) + discount * Vhat[next_state]) 
+                              for next_state in world.all_states)
     return Vhat, pihat
 
 if __name__ == "__main__":
@@ -90,26 +95,31 @@ if __name__ == "__main__":
     actions = ["stay","right","left","up","down"]
     xdim = 20
     ydim = 20
-    discount = 0.99
+    discount = 0.7
     convergence_threshold = 0.0001
-    payoff = 200
+    payoff = 100
     payoff_loc = (3,2)
     cost = -1
     reward = Reward(payoff_loc, payoff=payoff, cost=cost)
     transition = Transition()
     world = World(xdim, ydim, reward, transition)
 
+    start = time.perf_counter()
+
     # Value Iteration and Optimal Policy Computation
-    # Vhat = value_iteration(world, actions, discount, convergence_threshold)
-    # policy = compute_policy(world, Vhat, discount)
+    Vhat = value_iteration(world, actions, discount, convergence_threshold)
+    policy = compute_policy(world, Vhat, discount)
 
-    Vhat, policy = policy_iteration(world, actions, discount)
+    # Vhat, policy = policy_iteration(world, actions, discount)
+    print(f"Value function max: {np.max(Vhat):.3f}, Value function min: {np.min(Vhat):.3f}")
 
+    end = time.perf_counter()
+    print(f"Time taken: {end - start:.4f} seconds")
     # Plotting
     fig, ax = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(10,5))
     plot_actions = {"stay":(0,0), "right":(0.4,0), "left":(-0.4,0), "up":(0,0.4), "down":(0,-0.4)}
     ax[0].imshow(Vhat.reshape(xdim, ydim).T, origin="lower")
-    ax[0].set_title(f"Value Iteration -- discount:{discount}, payoff:{payoff}, goal:{payoff_loc}")
+    ax[0].set_title(f"Value iteration -- discount:{discount}, payoff:{payoff}, goal:{payoff_loc}")
 
     ax[1].imshow(Vhat.reshape(xdim, ydim).T, origin="lower")
     for key, value in policy.items():
